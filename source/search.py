@@ -1,21 +1,21 @@
 import urllib2, re, time
-    
-def find_links(link):
-    # Input takes in a link address
-    # Outputs list containing all links found
-    # Function uses regular expression search
-    source_code = urllib2.urlopen(link).read()
+
+# Returns source code from url (changes all characters to lowercase)
+def get_page_source(link):
+    try:
+        return urllib2.urlopen(link).read().lower()
+    except Exception:
+        return ""
+
+# Outputs list containing all links found from source
+def find_links(link, source):
     linkpattern = re.compile('(?<=<a href=")http[^"]+')
-    links_found = re.findall(linkpattern, source_code)
+    links_found = re.findall(linkpattern, source)
     return links_found
 
-def web_crawler(seed, max_depth):
-    # Will only searches for full link addresses
-    # Input parameters takes seed, max_depth, filename
-    # Outputs list of all links crawled to a certain depth
-    # seed: starting link for crawling
-    # max_depth: maximum depth of links to find while crawling
-    # filename: file name to save results
+# Returns an index containing keywords and its associated urls
+def web_index_crawler(seed, max_depth):
+    search_index = []
     visited   = []
     unvisited = [seed]
     current_depth  = 0
@@ -26,12 +26,14 @@ def web_crawler(seed, max_depth):
             url = unvisited.pop(0)
             if current_depth > max_depth:
                 break
-            if url not in visited:
-                visited.append(url)
-                for u in find_links(url):
-                    if u not in visited and u not in unvisited:
-                        unvisited.append(u)
-                print "Crawled: %s" % url
+            visited.append(url)
+            source_code = get_page_source(url)
+            links_found = find_links(url, source_code)
+            index_page(search_index, url, source_code)
+            for u in links_found:
+                if u not in visited and u not in unvisited:
+                    unvisited.append(u)
+            print "Crawled: %s" % url
             if current_branch < current_seeds:
                 current_branch += 1
             else:
@@ -40,24 +42,49 @@ def web_crawler(seed, max_depth):
                 current_depth += 1
         except Exception:
             pass
-    return visited
+    return search_index
 
+# Creates a new blank text file using filename
 def new_file(filename):
     txtfile = open(filename+'.txt', 'w')
     txtfile.close()
 
+# ---Data Structure commands
+# Adds a keyword and its url to index
 def add_to_index(index, keyword, url):
-    key_index  = 0
-    key_exists = False
     for keys in index:
         if keys[0] == keyword:
-            key_exists = True
-            break
-        key_index += 1
-    if key_exists:
-        index[key_index][1].append(url)
-    else:
-        index.append([keyword, [url]])
+            keys[1].append(url)
+            return
+    index.append([keyword, [url]])
+
+# Adds all keywords in page source to index
+def index_page(index, url, content):
+    keywords = content.split()
+    for word in keywords:
+        add_to_index(index, word, url)
+
+# Returns associated urls with keyword
+def lookup(index, keyword):
+    for entries in index:
+        if entries[0] == keyword:
+            return entries[1]
+    return []
+
+# Separates phrases by characters in splitlist
+def split_string(source, splitlist):
+    words = []
+    build = ""
+    for c in source:
+        if c not in splitlist:
+            build += c
+        else:
+            if len(build) > 0:
+                words.append(build)
+                build = ""
+    if len(build) > 0:
+        words.append(build)
+    return words
 
 def main():
     filename = 'links'
@@ -65,21 +92,23 @@ def main():
     hstat = "http://www.hstat.org"
     udacity = "http://www.udacity.com/cs101x/index.html"
     xkcd = "http://www.xkcd.com"
-    wiki = "http://en.wikipedia.org/wiki/Website"
     depth = 1
     print "Starting web crawler...\n"
     
     # Start web crawler
     start_time = time.clock()
-    all_links = web_crawler(wiki, depth)
+    index = web_index_crawler(udacity, depth)
+    
+    # Index Searching
+    lookup_test = 'the'
+    print "\nPerforming search: %s" % lookup_test 
+    print lookup(index, lookup_test)
     
     # Saving results to text file
-    new_file(filename)
-    txtfile = open(filename+'.txt', 'a')
-    for i in all_links:
-        txtfile.write(i+'\n')
-    txtfile.write("\nRunning time: %.5f sec" % (time.clock()-start_time))
-    txtfile.close()
+    #new_file(filename)
+    #txtfile = open(filename+'.txt', 'a')
+    #txtfile.write("\nRunning time: %.5f sec" % (time.clock()-start_time))
+    #txtfile.close()
     print "\nTask complete."
     
     # Computation time for session
