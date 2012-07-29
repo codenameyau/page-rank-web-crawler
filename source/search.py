@@ -54,7 +54,8 @@ def new_file(filename):
 def add_to_index(index, keyword, url):
     for keys in index:
         if keys[0] == keyword:
-            keys[1].append(url)
+            if url not in keys[1]:
+                keys[1].append(url)
             return
     index.append([keyword, [url]])
 
@@ -72,11 +73,11 @@ def lookup(index, keyword):
     return []
 
 # Separates phrases by characters in splitlist
-def split_string(source, splitlist):
+def split_string(source, splitchars):
     words = []
     build = ""
     for c in source:
-        if c not in splitlist:
+        if c not in splitchars:
             build += c
         else:
             if len(build) > 0:
@@ -86,7 +87,44 @@ def split_string(source, splitlist):
         words.append(build)
     return words
 
+# Hash table functions
+# Returns an empty hash table
+def make_hashtable(buckets):
+    hash_table = []
+    for n in xrange(buckets):
+        hash_table.append([])
+    return hash_table
+
+# Acquire hash for given keyword based on buckets
+def hash_string(keyword, buckets):
+    hash = 0
+    for c in keyword:
+        hash = (hash + ord(c)) % buckets
+    return hash
+
+# Retrieves bucket appropriate for keyword
+def get_bucket(hash_table, keyword):
+    hash_size = len(hash_table)
+    return hash_table[hash_string(keyword, hash_size)]
+
+# Adds entry to appropriate bucket
+def add_to_bucket(hash_table, key, value):
+    bucket = get_bucket(hash_table, key)
+    bucket.append([key, value])
+    return hash_table
+
+# Lookup entry in hash table, returns 'None' if not found
+def hash_lookup(hash_table, key):
+    bucket = get_bucket(hash_table, key)
+    for k in bucket:
+        if k[0] == key:
+            return k[1]
+
 def main():
+    test_crawler()
+
+# Test functions
+def test_crawler():
     filename = 'links'
     # Sample seed links
     hstat = "http://www.hstat.org"
@@ -100,7 +138,7 @@ def main():
     index = web_index_crawler(udacity, depth)
     
     # Index Searching
-    lookup_test = 'the'
+    lookup_test = 'a'
     print "\nPerforming search: %s" % lookup_test 
     print lookup(index, lookup_test)
     
@@ -113,5 +151,5 @@ def main():
     
     # Computation time for session
     print "Running time: %.5f sec" % (time.clock()-start_time)
-
+    
 main()
