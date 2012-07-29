@@ -107,7 +107,7 @@ def get_bucket(hash_table, keyword):
     hash_size = len(hash_table)
     return hash_table[hash_string(keyword, hash_size)]
 
-# Adds entry to appropriate bucket
+# Adds entry to appropriate bucket even if key exists
 def add_to_bucket(hash_table, key, value):
     bucket = get_bucket(hash_table, key)
     bucket.append([key, value])
@@ -119,9 +119,25 @@ def hash_lookup(hash_table, key):
     for k in bucket:
         if k[0] == key:
             return k[1]
+    return None
+
+# Update value of hash key, adds to bucket if not present
+def hash_update(hash_table, key, value):
+    bucket = get_bucket(hash_table, key)
+    for k in bucket:
+        if k[0] == key:
+            k[1] = value
+            break
+    else:
+        bucket.append([key,value])
+    return hash_table
 
 def main():
-    test_crawler()
+    index = make_hashtable(10)
+    hash_update(index, "Hello", 3023)
+    print index
+    print hash_lookup(index, "Hello")
+    
 
 # Test functions
 def test_crawler():
