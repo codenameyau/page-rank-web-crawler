@@ -21,14 +21,14 @@ def find_links(source, domain, visited, unvisited):
         if l.endswith('/'):
             l = l[:-1]
         if domain in l and l not in new_links:
-            if l not in visited and l not in unvisited:
-                new_links.append(l)
+            new_links.append(l)
     return new_links
 
 # Crawls seed page up to depth of max_depth, limit crawl to domain
 # Returns a dictionary containing keywords and its urls
 def web_index_crawler(seed, max_depth, limit=True):
     search_index = {}
+    web_graph = {}
     visited   = []
     unvisited = [seed]
     current_depth  = 0
@@ -40,16 +40,19 @@ def web_index_crawler(seed, max_depth, limit=True):
         domain = re.search(R'\.\w+\.', seed).group().strip('.')
     while unvisited:
         try:
-            url = unvisited.pop(0)
-            print "Crawling: %s" % url
             if current_depth > max_depth:
                 break
+            url = unvisited.pop(0)
+            web_graph[url] = []
+            print "Crawling: %s" % url
             visited.append(url)
             source_code = get_page_source(url)
             links_found = find_links(source_code, domain, visited, unvisited)
             index_page(search_index, url, source_code)
             for u in links_found:
-                unvisited.append(u)
+                if u not in visited and u not in unvisited:
+                    unvisited.append(u)
+                web_graph[url].append(u)
             if current_branch < current_seeds:
                 current_branch += 1
             else:
@@ -58,7 +61,7 @@ def web_index_crawler(seed, max_depth, limit=True):
                 current_depth += 1
         except Exception:
             pass
-    return search_index
+    return search_index, web_graph
 
 # Adds all keywords in source content to index
 def index_page(index, url, content):
@@ -79,25 +82,6 @@ def lookup(index, keyword):
         return index[keyword]
     except Exception:
         return []
-
-def compute_ranks(graph):
-    d = 0.8 # damping factor
-    numloops = 10
-    ranks = {}
-    npages = len(graph)
-    for page in graph:
-        ranks[page] = 1.0 / npages
-
-    for i in range(0, numloops):
-        newranks = {}
-        for page in graph:
-            newrank = (1 - d) / npages
-            for node in graph:
-                if page in graph[node]:
-                    newrank = newrank + d * (ranks[node] / len(graph[node]))
-            newranks[page] = newrank
-        ranks = newranks
-    return ranks
 
 def quicksort(n):
     size = len(n)
@@ -129,10 +113,28 @@ def ordered_search(index, ranks, keyword):
     for i in index[keyword]:
         urls.append([i,ranks[i]])
     quicksort_urls = quicksort(urls)
-    rankings = []
-    for l in quicksort_urls:
-        rankings.append(l[0])
-    return rankings
+    urls = [] # Empty and reuse list
+    for l in reversed(quicksort_urls):
+        urls.append(l[0])
+    return urls
+
+def compute_ranks(graph):
+    d = 0.8 # damping factor
+    numloops = 8
+    ranks = {}
+    npages = len(graph)
+    for page in graph:
+        ranks[page] = 1.0 / npages
+    for i in range(0, numloops):
+        newranks = {}
+        for page in graph:
+            newrank = (1 - d) / npages
+            for node in graph:
+                if page in graph[node]:
+                    newrank = newrank + d * (ranks[node] / len(graph[node]))
+            newranks[page] = newrank
+        ranks = newranks
+    return ranks
 
 # Test functions
 def test_crawler():
@@ -142,32 +144,22 @@ def test_crawler():
     udacity = "http://www.udacity.com/cs101x/index.html"
     xkcd = "http://www.xkcd.com"
     python = "http://docs.python.org/index.html"
-    depth = 1
+    depth = 2
+    keyword = "python"
     print "Starting web crawler...\n"
     
     # Start web crawler
     start_time = time.clock()
-    index = web_index_crawler(python, depth, True)
-    
-    # Index Searching
-    lookup_test = 'python'
-    print "\nSearching: %s" % lookup_test
-    results = lookup(index, lookup_test)
-    linksfound = len(results)
-    print "Results Found: %d" % linksfound
+    index, network = web_index_crawler(xkcd, depth, True)
+    rankings = compute_ranks(network)
+    results = ordered_search(index, rankings, keyword)
+    print "\nSearched: %s" % keyword
     print results
-
-    # Saving results to text file
-    #new_file(filename)
-    #txtfile = open(filename+'.txt', 'a')
-    #txtfile.write("\nRunning time: %.5f sec" % (time.clock()-start_time))
-    #txtfile.close()
-    print "\nTask complete."
     
+    print "\nTask complete."
     # Computation time for session
     print "Running time: %.5f sec" % (time.clock()-start_time)
     
-
 def main():
     test_crawler()
     
