@@ -1,6 +1,8 @@
 # File: crawler.py
 # Domain web crawler with searching
-import urllib2, re, time 
+# Last updated: 8-14-2012
+
+import urllib2, re, time, random
 
 # Returns source code from url (changes all characters to lowercase)
 def get_page_source(link):
@@ -25,7 +27,7 @@ def find_links(source, domain, visited, unvisited):
     return new_links
 
 # Crawls seed page up to depth of max_depth, limit crawl to domain
-# Returns a dictionary containing keywords and its urls
+# Returns a dictionary containing {keywords: [urls]} with web graph 
 def web_index_crawler(seed, max_depth, limit=True):
     search_index = {}
     web_graph = {}
@@ -46,8 +48,11 @@ def web_index_crawler(seed, max_depth, limit=True):
             web_graph[url] = []
             print "Crawling: %s" % url
             visited.append(url)
+            # Get source code of web page of url
             source_code = get_page_source(url)
+            # Find all links in source code containing domain name in url
             links_found = find_links(source_code, domain, visited, unvisited)
+            # Indexes the url with all keywords (non tags) in source code
             index_page(search_index, url, source_code)
             for u in links_found:
                 if u not in visited and u not in unvisited:
@@ -95,36 +100,7 @@ def index_page(index, url, content):
         elif url not in index[word]:
             index[word].append(url)
 
-# Returns associated urls with keyword
-def lookup(index, keyword):
-    try:
-        return index[keyword]
-    except Exception:
-        return []
-
-def quicksort(n):
-    size = len(n)
-    if size <= 1:
-        return n
-    # Choose pivots, make list of partitions
-    pivot = [n[0]]
-    left  = []
-    right = []
-    for i in n:
-        value = i[1]
-        # Add to smaller partition
-        if value < pivot[0][1]:
-            left.append(i)
-        # Add to larger partition
-        elif value > pivot[0][1]:
-            right.append(i)
-    # Recursive quicksort of left and right partitions
-    left = quicksort(left)
-    right = quicksort(right)
-    # Returns sorted 2-dimension list of urls and ranking
-    ranking = left + pivot + right
-    return ranking
-    
+# Udacity csc101 implementation of google's PageRank
 def compute_ranks(graph):
     d = 0.8 # damping factor
     numloops = 8
@@ -142,6 +118,30 @@ def compute_ranks(graph):
             newranks[page] = newrank
         ranks = newranks
     return ranks
+
+# Takes in list of urls with ranks, returns sorted list of highest to lowest ranks
+def quicksort(n):
+    size = len(n)
+    if size <= 1:
+        return n
+    # Choose pivots, make list of partitions
+    pivot = [n[random.randint(0,size-1)]]
+    left  = []
+    right = []
+    for i in n:
+        value = i[1]
+        # Add to smaller partition
+        if value < pivot[0][1]:
+            left.append(i)
+        # Add to larger partition
+        elif value > pivot[0][1]:
+            right.append(i)
+    # Recursive quicksort of left and right partitions
+    left = quicksort(left)
+    right = quicksort(right)
+    # Returns sorted 2-dimension list of urls and ranking
+    ranking = left + pivot + right
+    return ranking
 
 # Returns list containing urls sorted in highest to lowest ranking
 def ordered_search(index, ranks, keyword):
@@ -163,20 +163,35 @@ def ordered_search(index, ranks, keyword):
 
 # Test functions
 def test_crawler():
-    filename = 'links'
     # Sample seed links
+    """
     hstat = "http://www.hstat.org"
     udacity = "http://www.udacity.com/cs101x/index.html"
     xkcd = "http://www.xkcd.com"
-    python = "http://docs.python.org/index.html"
+    python = "http://docs.python.org/release/2.7.3/"
     depth = 2
+    """
+    print "Welcome to the Simple HTML-Web-Crawler!"
+    website = raw_input("Enter full URL: ")
+    while True:
+        try:
+            depth = int(raw_input("Enter depth to crawl: "))
+            break
+        except Exception:
+            pass
     print "Starting web crawler...\n"
-    
+
     # Start web crawler
-    start_time = time.clock()
-    index, network = web_index_crawler(udacity, depth, True)
-    rankings = compute_ranks(network)
-    
+    try:
+        start_time = time.clock()
+        index, network = web_index_crawler(website, depth, True)
+        rankings = compute_ranks(network)
+    except Exception:
+        print "URL cannot be processed. Terminating Program..."
+        return
+    if len(index) < 1:
+        print "That website cannot be crawled. Terminating Program..."
+        return
     print "\nWeb crawler complete."
     # Computation time for session
     print "Running time: %.5f sec" % (time.clock()-start_time)
