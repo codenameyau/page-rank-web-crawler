@@ -1,6 +1,6 @@
 # File: crawler.py
 # Domain web crawler with searching
-import urllib2, re, time
+import urllib2, re, time 
 
 # Returns source code from url (changes all characters to lowercase)
 def get_page_source(link):
@@ -63,13 +63,32 @@ def web_index_crawler(seed, max_depth, limit=True):
             pass
     return search_index, web_graph
 
-# Adds all keywords in source content to index
+# Takes in source code are returns all words not in tags
+def html_get_words(source):
+    words = []
+    s, t = 0, 0
+    while True:
+        t = source.find(">", s)
+        s = source.find("<", t)
+        keywords = source[t+1:s].split()
+        for i in keywords:
+            if i not in words:
+                words.append(i)
+        if s == -1:
+            break
+    return words
+
+# Adds all keywords in source content to index, removing punctuation
 def index_page(index, url, content):
-    source_contents = content.split()
+    source_contents = html_get_words(content)
     keywords = []
     for i in source_contents:
-        if i.isalnum():
+        if i.isalnum() and i not in keywords:
             keywords.append(i)
+        elif not i.isalnum():
+            w = i.strip('!?.,;:')
+            if len(w) > 0:
+                keywords.append(w)
     for word in keywords:
         if word not in index:
             index[word] = [url]
@@ -106,18 +125,6 @@ def quicksort(n):
     ranking = left + pivot + right
     return ranking
     
-def ordered_search(index, ranks, keyword):
-    urls = []
-    if keyword not in index:
-        return None
-    for i in index[keyword]:
-        urls.append([i,ranks[i]])
-    quicksort_urls = quicksort(urls)
-    urls = [] # Empty and reuse list
-    for l in reversed(quicksort_urls):
-        urls.append(l[0])
-    return urls
-
 def compute_ranks(graph):
     d = 0.8 # damping factor
     numloops = 8
@@ -136,6 +143,24 @@ def compute_ranks(graph):
         ranks = newranks
     return ranks
 
+# Returns list containing urls sorted in highest to lowest ranking
+def ordered_search(index, ranks, keyword):
+    keywords = keyword.split()
+    urls = []
+    for k in keywords:
+        if k not in index:
+            return []
+    for word in keywords:
+        links = index[word]
+        for i in links:
+            if i not in urls:
+                urls.append([i,ranks[i]])
+    sorted_ranks = quicksort(urls)
+    urls = []
+    for i in reversed(sorted_ranks):
+        urls.append(i[0])
+    return urls
+
 # Test functions
 def test_crawler():
     filename = 'links'
@@ -145,20 +170,33 @@ def test_crawler():
     xkcd = "http://www.xkcd.com"
     python = "http://docs.python.org/index.html"
     depth = 2
-    keyword = "python"
     print "Starting web crawler...\n"
     
     # Start web crawler
     start_time = time.clock()
-    index, network = web_index_crawler(xkcd, depth, True)
+    index, network = web_index_crawler(udacity, depth, True)
     rankings = compute_ranks(network)
-    results = ordered_search(index, rankings, keyword)
-    print "\nSearched: %s" % keyword
-    print results
     
-    print "\nTask complete."
+    print "\nWeb crawler complete."
     # Computation time for session
     print "Running time: %.5f sec" % (time.clock()-start_time)
+    print "Permitting searches. Enter 'q' to quit."
+    
+    # Loop lookup until user quits
+    while True:
+        try:
+            # Enter q to quit
+            keyword = raw_input("\nEnter search: ").lower()
+            if keyword == 'q':
+                print "\nSearch complete."
+                break
+            start = time.clock()
+            results = ordered_search(index, rankings, keyword)
+            print "Found %d results in %.5f sec" % (len(results), time.clock()-start)
+            for link in results:
+                print link
+        except Exception:
+            pass
     
 def main():
     test_crawler()
